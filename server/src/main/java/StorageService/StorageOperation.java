@@ -1,4 +1,4 @@
-package server;
+package StorageService;
 
 public enum StorageOperation {
     UPLOAD,

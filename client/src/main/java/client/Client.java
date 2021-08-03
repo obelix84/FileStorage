@@ -23,7 +23,7 @@ public class Client {
                     System.out.println("connected");
                     //посылаем протокол
                     SimpleProtocol message2 = new SimpleProtocol(Operation.UPLOAD,
-                            "server/src/main/resources/test1_serv.txt", 10_000_000);
+                            "test1_serv.txt", 10_000_000);
 
                     ObjectOutputStream outObj2 = new ObjectOutputStream(socket2.getOutputStream());
 
@@ -61,7 +61,7 @@ public class Client {
                     System.out.println("connected");
                     //посылаем протокол
                     SimpleProtocol message1 = new SimpleProtocol(Operation.UPLOAD,
-                            "server/src/main/resources/test2_serv.txt", 6504);
+                            "test2_serv.txt", 6504);
 
                     ObjectOutputStream outObj1 = new ObjectOutputStream(socket1.getOutputStream());
 
@@ -100,7 +100,7 @@ public class Client {
                     System.out.println("connected");
                     //посылаем протокол
                     SimpleProtocol message1 = new SimpleProtocol(Operation.UPLOAD,
-                            "server/src/main/resources/test3_serv.txt", 1533);
+                            "test3_serv.txt", 1533);
 
                     ObjectOutputStream outObj1 = new ObjectOutputStream(socket1.getOutputStream());
 

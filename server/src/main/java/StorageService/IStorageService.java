@@ -1,8 +1,10 @@
-package server;
-//интерфейс для получения файла из хранилища
+package StorageService;
+
+//интерфейс для получения файла из хранилища для КОНКРЕТНОГО ПОЛЬЗОВАТЕЛЯ
 public interface IStorageService {
-    //метод необходит для создания дескрипторов, чтоб не открывать и закрывать лдишний раз
-    public boolean initService(String path, StorageOperation type);
+    //метод необходим для создания дескрипторов, чтоб не открывать и закрывать лишний раз
+    //на вход подаем имя пользователя и имя файла которое надо достать из хранилища
+    public boolean initService(String user, String fileName, StorageOperation type);
     //очищает ресурсы, закрывает соединение и т.п.
     public boolean stop();
     //методы для записи и чтения файла целиком

@@ -1,5 +1,7 @@
 package server;
 
+import StorageService.FileStorageService;
+import StorageService.StorageOperation;
 import protocol.*;
 
 import java.io.*;
@@ -17,7 +19,7 @@ public class Server {
         //подключаем файл конфигурации
         cfg = new Configuration();
         //задаем кол-во потоков
-        int countOfThreads = Integer.parseInt(cfg.getProperty("thread.count"));
+        int countOfThreads = Integer.parseInt(cfg.getProperty("server.threads"));
         if (countOfThreads == 0)
             countOfThreads = Runtime.getRuntime().availableProcessors()*2;
         // инициализация ресурсов для работы
@@ -29,8 +31,9 @@ public class Server {
     // запуск сервера
     public void start() {
         try {
-            server = new ServerSocket(10000);
+            server = new ServerSocket(Integer.parseInt(cfg.getProperty("server.port")));
             System.out.println("Server started");
+            System.out.println(System.getProperty("user.dir"));
 
             while (true) {
                 Socket socket = server.accept();
@@ -57,7 +60,7 @@ public class Server {
                     System.out.println(SP.size);
                     System.out.println(SP.type);
                     System.out.println("reading...." + socket.getRemoteSocketAddress());
-                    this.readFileFromSocket(socket, SP.size, SP.fileName, Integer.parseInt(cfg.getProperty("buffer.size")));
+                    this.readFileFromSocket(socket, SP.size, SP.fileName, Integer.parseInt(cfg.getProperty("server.bufferSize")));
                     System.out.println("stop...." + socket.getRemoteSocketAddress());
 
 
@@ -95,8 +98,8 @@ public class Server {
             return;
         }
 
-        FileStorageService fss = new FileStorageService();
-        fss.initService(filename, StorageOperation.UPLOAD);
+        FileStorageService fss = new FileStorageService(this.cfg);
+        fss.initService("login1", filename, StorageOperation.UPLOAD);
 
         System.out.println("Reading from socket " + filename);
         byte[] buffer = new byte[bufSize];

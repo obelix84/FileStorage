@@ -1,20 +1,28 @@
-package server;
+package StorageService;
+
+import server.Configuration;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+//сервис хранения файлов на сервере в файлах
 public class FileStorageService implements IStorageService {
     private FileInputStream fileIn;
     private FileOutputStream fileOut;
+    private Configuration configuration;
 
-    public FileStorageService() {
-
+    //DI
+    public FileStorageService(Configuration conf) {
+        this.configuration = conf;
     }
 
     @Override
-    public boolean initService(String path, StorageOperation type) {
+    public boolean initService(String user, String fileName, StorageOperation type) {
+        //формируем путь к фалу пользователя
+
+        String path = this.configuration.getProperty("server.storageDirectory")+ "/"+ user + "/" + fileName;
         try {
             if (type == StorageOperation.UPLOAD) {
                 fileOut = new FileOutputStream(path);
