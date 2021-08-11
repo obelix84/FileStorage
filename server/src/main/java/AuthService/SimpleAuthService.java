@@ -3,18 +3,7 @@ package AuthService;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SimpleAuthService implements IAuthService{
-
-    private class UserData {
-        String login;
-        String password;
-
-        public UserData(String login, String password) {
-            this.login = login;
-            this.password = password;
-        }
-    }
-
+public class SimpleAuthService implements AuthService{
     private List<UserData> users;
 
     public SimpleAuthService() {
@@ -26,7 +15,7 @@ public class SimpleAuthService implements IAuthService{
     @Override
     public boolean isValidUser(String login, String password) {
         for (UserData user : users) {
-            if(user.login.equals(login) && user.password.equals(password)){
+            if(user.getLogin().equals(login) && user.getPassword().equals(password)){
                 return true;
             }
         }
