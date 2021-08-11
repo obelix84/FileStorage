@@ -1,7 +1,6 @@
 package server;
 
-import AuthService.AuthService;
-import AuthService.SimpleAuthService;
+import AuthService.*;
 import DatabaseHelper.SQLHelper;
 import StorageService.FileStorageService;
 import StorageService.StorageOperation;
@@ -23,10 +22,10 @@ public class Server {
     public Server() {
         //подключаем файл конфигурации
         cfg = new Configuration();
-        //пока берем упрощенный сервер авторизации
-        authService = new SimpleAuthService();
         //подлючаем доступ к базе данных
         DB = new SQLHelper("filestorage", "qwerty");
+        //пока берем упрощенный сервер авторизации
+        authService = new DBAuthService(DB);
         System.out.println(DB.getUserDataByLogin("login1").toString());
         //задаем кол-во потоков
         int countOfThreads = Integer.parseInt(cfg.getProperty("server.threads"));
@@ -49,87 +48,102 @@ public class Server {
                 System.out.println("Клиент подключился");
                 System.out.println("Клиент: " + socket.getRemoteSocketAddress());
                 //каждому новому клиенту поток
-                new Thread(() -> {
+                THREAD_POOL.execute(() -> {
                     //тестируем протокол
                     ObjectInputStream inObj = null;
                     ObjectOutputStream outObj = null;
+                    //пользователь работающий в данном потоке
+                    UserData user = null;
                     try {
                         //открываем обработчики сообщений
                         inObj = new ObjectInputStream(socket.getInputStream());
                         outObj = new ObjectOutputStream(socket.getOutputStream());
+                        //авторизация
+                        boolean isNotAuth = true;
+                        while(isNotAuth) {
+                            //Обрабатываем сообщения от клиента
+                            ExchangeProtocol incMessage = null;
+                            //исходящее сообщение
+                            ExchangeProtocol outMessage = new ExchangeProtocol();
+                            try {
+                                incMessage = (ExchangeProtocol) inObj.readObject();
+                            } catch (IOException | ClassNotFoundException e) {
+                                e.printStackTrace();
+                            }
+
+                            System.out.println(incMessage.type);
+                            //авторизация пользователя
+                            if (incMessage.type == Operation.AUTH) {
+                                System.out.println("Проверяем авторизацию пользователя");
+                                System.out.println(outMessage.type);
+                                System.out.println(incMessage.login);
+                                System.out.println(incMessage.password);
+                                System.out.println(this.authService.getUserData(incMessage.login, incMessage.password));
+                                user = this.authService.getUserData(incMessage.login, incMessage.password);
+                                if (user != null) {
+                                    outMessage.setType(Operation.AUTH_OK);
+                                    isNotAuth = false;
+                                } else {
+                                    outMessage.setType(Operation.AUTH_ERR);
+                                }
+                                System.out.println(outMessage.type);
+                                try {
+                                    //пропихиваем ответ назад
+                                    outObj.writeObject(outMessage);
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+
+                        // цикл после авторизации
+                        while (true) {
+                            //ждем входящего сообщения
+                            ExchangeProtocol incMessage = null;
+                            try {
+                                incMessage = (ExchangeProtocol) inObj.readObject();
+                            } catch (IOException | ClassNotFoundException e) {
+                                e.printStackTrace();
+                            }
+                            if (incMessage.type == Operation.UPLOAD){
+                                System.out.println(incMessage.type);
+                                System.out.println(incMessage.fileName);
+                                //ToDo: необходимо сделать проверку на возможность записи файла
+                                ExchangeProtocol answer = new ExchangeProtocol();
+                                answer.setType(Operation.UPLOAD_CONFIRM);
+                                int buffSize = Integer.parseInt(cfg.getProperty("server.bufferSize"));
+                                answer.bufferSize = buffSize;
+                                try {
+                                    //пропихиваем ответ назад
+                                    outObj.writeObject(answer);
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                                this.readFileFromSocket(inObj,
+                                        user.getDefaultDir() != null? user.getDefaultDir(): user.getLogin(),
+                                        incMessage.size, incMessage.fileName, buffSize);
+                            }
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
-                    } //TODO: блок finally
-
-                    //авторизация
-                    boolean isNotAuth = true;
-                    while(isNotAuth) {
-                        //Обрабатываем сообщения от клиента
-                        ExchangeProtocol incMessage = null;
-                        //исходящее сообщение
-                        ExchangeProtocol outMessage = new ExchangeProtocol();
+                    } finally {
                         try {
-                            incMessage = (ExchangeProtocol) inObj.readObject();
-                        } catch (IOException | ClassNotFoundException e) {
+                            if (outObj != null) {
+                                outObj.close();
+                            }
+                            if (inObj != null) {
+                                inObj.close();
+                            }
+                        } catch (IOException e) {
                             e.printStackTrace();
                         }
-
-                        System.out.println(incMessage.type);
-                        //авторизация пользователя
-                        if (incMessage.type == Operation.AUTH) {
-                            System.out.println("Проверяем авторизацию пользователя");
-                            System.out.println(outMessage.type);
-                            System.out.println(incMessage.login);
-                            System.out.println(incMessage.password);
-                            System.out.println(this.authService.isValidUser(incMessage.login, incMessage.password));
-                            if (this.authService.isValidUser(incMessage.login, incMessage.password)) {
-                                outMessage.setType(Operation.AUTH_OK);
-                                isNotAuth = false;
-                            } else {
-                                outMessage.setType(Operation.AUTH_ERR);
-                            }
-                            System.out.println(outMessage.type);
-                            try {
-                                //пропихиваем ответ назад
-                                outObj.writeObject(outMessage);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        }
                     }
-                    // цикл после авторизации
-                    while (true) {
-                        //ждем входящего сообщения
-                        ExchangeProtocol incMessage = null;
-                        try {
-                            incMessage = (ExchangeProtocol) inObj.readObject();
-                        } catch (IOException | ClassNotFoundException e) {
-                            e.printStackTrace();
-                        }
-                        if (incMessage.type == Operation.UPLOAD){
-                            System.out.println(incMessage.type);
-                            System.out.println(incMessage.fileName);
-                            //ToDo: необходимо сделать проверку на возможность записи файла
-                            ExchangeProtocol answer = new ExchangeProtocol();
-                            answer.setType(Operation.UPLOAD_CONFIRM);
-                            int buffSize = Integer.parseInt(cfg.getProperty("server.bufferSize"));
-                            answer.bufferSize = buffSize;
-                            try {
-                                //пропихиваем ответ назад
-                                outObj.writeObject(answer);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                            this.readFileFromSocket(inObj, incMessage.size, incMessage.fileName, buffSize);
-                        }
-                    }
-                }).start();
 
+                });
             }
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-            System.out.println("Стоп");
             this.stop();
         }
 
@@ -142,14 +156,15 @@ public class Server {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        this.DB.disconnect();
         THREAD_POOL.shutdownNow();
     }
 
     //читаем файл из objectInputStream
-    public void readFileFromSocket(ObjectInputStream in, long length, String filename, int bufSize) {
+    public void readFileFromSocket(ObjectInputStream in, String user, long length, String filename, int bufSize) {
         //создаем сервис хранения файлов
         FileStorageService fss = new FileStorageService(this.cfg);
-        fss.initService("login1", filename, StorageOperation.UPLOAD);
+        fss.initService(user, filename, StorageOperation.UPLOAD);
 
         System.out.println("Reading from socket " + filename);
 

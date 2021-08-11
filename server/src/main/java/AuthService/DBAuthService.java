@@ -1,11 +1,22 @@
 package AuthService;
 
+import DatabaseHelper.SQLHelper;
+
 public class DBAuthService implements AuthService{
+    private SQLHelper DB;
+
+    public DBAuthService(SQLHelper DB) {
+        this.DB = DB;
+    }
 
     @Override
-    public boolean isValidUser(String login, String password) {
-
-        return false;
+    public UserData getUserData(String login, String password) {
+        UserData UD = this.DB.getUserDataByLogin(login);
+        //проверяем логин и пароль
+        if (UD.getPassword().equals(password)) {
+            return UD;
+        }
+        return null;
     }
 
     @Override

@@ -13,13 +13,13 @@ public class SimpleAuthService implements AuthService{
     }
 
     @Override
-    public boolean isValidUser(String login, String password) {
+    public UserData getUserData(String login, String password) {
         for (UserData user : users) {
             if(user.getLogin().equals(login) && user.getPassword().equals(password)){
-                return true;
+                return user;
             }
         }
-        return false;
+        return null;
     }
 
     @Override
