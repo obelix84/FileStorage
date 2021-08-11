@@ -122,29 +122,9 @@ public class Server {
                             }
                             this.readFileFromSocket(inObj, incMessage.size, incMessage.fileName, buffSize);
                         }
-
-                        //исходящее сообщение
-//                        for (Operation o: Operation.values()) {
-//                            ExchangeProtocol outMessage = new ExchangeProtocol();
-//                            outMessage.type = o;
-//                            try {
-//                                outObj.writeObject(outMessage);
-//                            } catch (IOException e) {
-//                                e.printStackTrace();
-//                            }
-//                        }
                     }
-//                    System.out.println("reading...." + socket.getRemoteSocketAddress());
-//                    this.readFileFromSocket(socket, SP.size, SP.fileName, Integer.parseInt(cfg.getProperty("server.bufferSize")));
-//                    System.out.println("stop...." + socket.getRemoteSocketAddress());
-
-
                 }).start();
-//                new Thread(() -> {
-//                    this.writeFileToSocket(socket, 10_000_000, "client/src/main/resources/test.txt", 1024);
-//                    System.out.println("read3");
-//
-//                }).start();
+
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -229,3 +209,25 @@ public class Server {
         }
     }
 }
+
+
+    //исходящее сообщение
+//                        for (Operation o: Operation.values()) {
+//                            ExchangeProtocol outMessage = new ExchangeProtocol();
+//                            outMessage.type = o;
+//                            try {
+//                                outObj.writeObject(outMessage);
+//                            } catch (IOException e) {
+//                                e.printStackTrace();
+//                            }
+//                        }
+
+//                    System.out.println("reading...." + socket.getRemoteSocketAddress());
+//                    this.readFileFromSocket(socket, SP.size, SP.fileName, Integer.parseInt(cfg.getProperty("server.bufferSize")));
+//                    System.out.println("stop...." + socket.getRemoteSocketAddress());
+
+//                new Thread(() -> {
+//                    this.writeFileToSocket(socket, 10_000_000, "client/src/main/resources/test.txt", 1024);
+//                    System.out.println("read3");
+//
+//                }).start();
