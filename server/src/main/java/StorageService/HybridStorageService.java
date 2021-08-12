@@ -1,6 +1,8 @@
 package StorageService;
 
 import AuthService.UserData;
+import DatabaseHelper.SQLHelper;
+import protocol.Operation;
 import server.Configuration;
 
 import java.io.FileInputStream;
@@ -8,21 +10,27 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
-//сервис хранения файлов на сервере в файлах
-public class FileStorageService implements StorageService {
+//гибридное файловое хранилище, файлы хранит по папкам пользователей, а информацию о файле хранит в БД
+public class HybridStorageService implements StorageService{
     private FileInputStream fileIn;
     private FileOutputStream fileOut;
     private Configuration configuration;
+    private SQLHelper DB;
+    private StorageOperation currentType;
 
-    //DI
-    public FileStorageService(Configuration conf) {
-        this.configuration = conf;
+    public HybridStorageService(Configuration configuration, SQLHelper DB) {
+        this.configuration = configuration;
+        this.DB = DB;
     }
 
     @Override
     public boolean initService(UserData user, String fileName, StorageOperation type) {
-        //формируем путь к фалу пользователя
-        String path = this.configuration.getProperty("server.storageDirectory")+ "/"+ user.getLogin() + "/" + fileName;
+        this.currentType = type;
+        //формируем путь к папке пользователя
+        String path;
+        if (user.getDefaultDir() == null) path = user.getLogin();
+        else path = user.getDefaultDir();
+        path = this.configuration.getProperty("server.storageDirectory") + "/" + path + "/";
         try {
             if (type == StorageOperation.UPLOAD) {
                 fileOut = new FileOutputStream(path);
@@ -59,41 +67,21 @@ public class FileStorageService implements StorageService {
 
     @Override
     public boolean writeFileToStorage(byte[] data) {
-        //пока не нужно
         return false;
     }
 
     @Override
     public boolean readFileFromStorage(byte[] data) {
-        //пока не нужно
         return false;
     }
 
     @Override
     public boolean writePartOfFileToStorage(byte[] data, int count) {
-        if (fileOut != null) {
-            try {
-                fileOut.write(data, 0, count);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return false;
-            }
-            return true;
-        } else {
-            return false;
-        }
+        return false;
     }
 
     @Override
     public boolean readPartOfFileFromStorage(byte[] data, int count) {
-        if (fileIn != null) {
-            try {
-                int c = fileIn.read(data, 0, count);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return false;
-            }
-        }
-        return true;
+        return false;
     }
 }

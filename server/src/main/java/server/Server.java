@@ -26,7 +26,10 @@ public class Server {
         DB = new SQLHelper("filestorage", "qwerty");
         //пока берем упрощенный сервер авторизации
         authService = new DBAuthService(DB);
-        System.out.println(DB.getUserDataByLogin("login1").toString());
+        UserData UD = DB.getUserDataByLogin("login2");
+        //System.out.println(UD);
+        //System.out.println(DB.getFileInfo("02.avi", 1).toString());
+        //System.out.println(DB.insertFileInfo("3.txt", "SomeDir", 100_100_100, UD));
         //задаем кол-во потоков
         int countOfThreads = Integer.parseInt(cfg.getProperty("server.threads"));
         if (countOfThreads == 0)
@@ -119,8 +122,7 @@ public class Server {
                                 } catch (IOException e) {
                                     e.printStackTrace();
                                 }
-                                this.readFileFromSocket(inObj,
-                                        user.getDefaultDir() != null? user.getDefaultDir(): user.getLogin(),
+                                this.readFileFromSocket(inObj, user,
                                         incMessage.size, incMessage.fileName, buffSize);
                             }
                         }
@@ -161,10 +163,10 @@ public class Server {
     }
 
     //читаем файл из objectInputStream
-    public void readFileFromSocket(ObjectInputStream in, String user, long length, String filename, int bufSize) {
+    public void readFileFromSocket(ObjectInputStream in, UserData UD, long length, String filename, int bufSize) {
         //создаем сервис хранения файлов
         FileStorageService fss = new FileStorageService(this.cfg);
-        fss.initService(user, filename, StorageOperation.UPLOAD);
+        fss.initService(UD, filename, StorageOperation.UPLOAD);
 
         System.out.println("Reading from socket " + filename);
 
