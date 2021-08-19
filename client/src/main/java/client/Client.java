@@ -7,6 +7,8 @@ import javax.sound.midi.Soundbank;
 import java.io.*;
 import java.net.Socket;
 import java.sql.SQLOutput;
+import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,13 +41,13 @@ public class Client {
             //цикл авторизации
             while(true) {
                 System.out.println("Соединение установлено");
-                System.out.print("Логин: \n> ");
+                System.out.print("Логин: ");
                 String login = console.nextLine();
                 if(login.equals("")) {
                     System.out.println("Логин не может быть пустым, попробуйте еще раз!");
                     continue;
                 }
-                System.out.print("Пароль: \n> ");
+                System.out.print("Пароль: ");
                 String password = console.nextLine();
                 if(password.equals("")) {
                     System.out.println("Пароль не может быть пустым, попробуйте еще раз!");
@@ -86,70 +88,176 @@ public class Client {
                     if(command.equals("exit")) {
                         break;
                     } else if (command.startsWith("upload")) {
-                        //загрузка файла на сервер
-                        //Загрузить файл на сервер UPLOAD source_path
+                        //Загрузить файл на сервер UPLOAD source_path [destination_folder]
                         String[] parts = command.split("\\s");
-                        System.out.println(parts[0]);
-                        System.out.println(parts[1]);
                         //смотри есть ли такой файл
-                        File file = new File(parts[1]);
-                        long length = file.length();
+                        File uploadFile = new File(parts[1]);
+                        System.out.println(parts[1]);
+                        long length = uploadFile.length();
                         if(length == 0) {
                             System.out.println("Файл не найден!");
-                            break;
+                            continue;
                         }
+
                         //формируем объекта для запроса на сервер
                         ExchangeProtocol uploadRequest = new ExchangeProtocol();
                         uploadRequest.setType(Operation.UPLOAD);
                         //избавляемся от пути
-                        String [] fileParts = parts[1].split("\\/");
-                        System.out.println(fileParts[fileParts.length - 1]);
+                        String[] fileParts = parts[1].split("\\/");
                         uploadRequest.setFileName(fileParts[fileParts.length - 1]);
                         uploadRequest.setSize(length);
-                        //upload C:/Users/obelix/test31.txt
-                        //upload C:/Users/obelix/test1.txt
-                        //upload C:/Users/obelix/02.avi
+                        if (parts.length > 2) {
+                            if (parts[2].substring(parts[2].length() - 1) == "/")
+                                uploadRequest.setSubDir(parts[2]);
+                            else
+                                uploadRequest.setSubDir(parts[2] + "/");
+                        } else {
+                            uploadRequest.setSubDir(null);
+                        }
+                        //отправляем сообщение на сервер
                         if (writeMessage(outObj, uploadRequest)) {
                             System.out.println("Ожидание ответа от сервера...");
-                            ExchangeProtocol incoming = readMessage(inObj);
-                            //если все норм и сервер готов принять файл
-                            if (incoming.type == Operation.UPLOAD_CONFIRM) {
-                                //открываем файл и кусками отправляем на сервер
-                                FileInputStream fin = new FileInputStream(parts[1]);
-                                OutputStream out = socket.getOutputStream();
-                                int count = 0;
-                                //отправляем на сервер
-                                System.out.println("Отправляем на север");
-                                while (true) {
-                                    ExchangeProtocol partFile = new ExchangeProtocol();
-                                    partFile.setType(Operation.UPLOAD_PART);
-                                    partFile.partFile = new byte[incoming.bufferSize];
-                                    count = fin.read(partFile.partFile);
-                                    if (count <= 0) break;
-                                    partFile.sizeOfPart = count;
-                                    outObj.writeObject(partFile);
-                                    //сбрасывает буффер, меньше жрет память, но замедляет процесс
-                                    outObj.reset();
-                                    System.out.print(".");
+                            //цикл обработки сообщений от сервера
+                            while (true) {
+                                ExchangeProtocol incoming = readMessage(inObj);
+                                if (incoming.type == Operation.UPLOAD_CONFIRM) {
+                                    //отправляем файл
+                                    sendFile(outObj, parts[1], incoming.getBufferSize());
+                                    break;
                                 }
-                                System.out.println(" готово!");
-                                fin.close();
+                                if (incoming.type == Operation.UPLOAD_EXIST) {
+                                    //перезаписать файл или нет?
+                                    System.out.println("Файл на сервере существует, перезаписать?");
+                                    System.out.print("[да/нет] > ");
+                                    command = console.nextLine();
+                                    if (command.equals("нет")) {
+                                        break;
+                                    } else if (command.equals("да")) {
+                                        //формируем объекта для запроса на сервер
+                                        ExchangeProtocol overwriteRequest = new ExchangeProtocol();
+                                        overwriteRequest.setType(Operation.UPLOAD_OVERWRITE);
+                                        overwriteRequest.setFileName(fileParts[fileParts.length - 1]);
+                                        overwriteRequest.setSize(length);
+                                        if (parts.length > 2) {
+                                            if (parts[2].substring(parts[2].length() - 1) == "/")
+                                                overwriteRequest.setSubDir(parts[2]);
+                                            else
+                                                overwriteRequest.setSubDir(parts[2] + "/");
+                                        } else {
+                                            overwriteRequest.setSubDir(null);
+                                        }
+                                        //отправить на сервер
+                                        if (writeMessage(outObj, overwriteRequest)) {
+                                            continue;
+                                        } else {
+                                            System.out.println("Ошибка отправки на сервер сообщения!");
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                         } else {
-                            System.out.println("Ошибка отправки запрос на сервер! Попробуйте снова.");
+                            System.out.println("Ошибка отправки запроса на сервер! Попробуйте снова.");
                         }
 
                     } else if (command.startsWith("download")) {
                         //загрузка файла на сервер
+                        //upload C:/Users/obelix/test31.txt lalala/bbb
+                        //upload C:/Users/obelix/test1.txt
+                        //upload C:/Users/obelix/02.avi
                         //DOWNLOAD server_path
                         String[] parts = command.split("\\s");
                         System.out.println(parts[0]);
                         System.out.println(parts[1]);
-                    }
+                        //вторая часть состоит из пути и имени файла
+                        String [] fileParts = parts[1].split("\\/");
+                        String subDir = "";
+                        if (fileParts.length > 1) {
+                            for (int i = 0; i < fileParts.length - 1; i++) {
+                                String filePart = fileParts[i];
+                                subDir += filePart + "/";
+                            }
+                        }
+                        System.out.println(subDir);
 
+                        //формируем объект для запроса на сервер
+                        ExchangeProtocol downRequest = new ExchangeProtocol();
+                        downRequest.setType(Operation.DOWNLOAD);
+                        downRequest.setSubDir(subDir);
+                        downRequest.setFileName(fileParts[fileParts.length - 1]);
+
+                    } else if (command.startsWith("list")) {
+                        //получение списка файлов
+
+                        ExchangeProtocol listRequest = new ExchangeProtocol();
+                        listRequest.setType(Operation.LIST);
+                        //отправляем сообщение на сервер
+                        if (writeMessage(outObj, listRequest)) {
+                            System.out.println("Ожидание ответа от сервера...");
+                            ExchangeProtocol incomingList = readMessage(inObj);
+                            //выводим список на экран
+                            ArrayList<String> filesList = incomingList.getList();
+                            for (String s : filesList) {
+                                System.out.println(s);
+                            }
+                            //сбросим кэш
+                            outObj.reset();
+                        }
+
+                    } else if (command.startsWith("delete")) {
+                        //Удалить файл с сервера DELETE path
+                        String[] parts = command.split("\\s");
+                        //смотри есть ли такой файл
+                        ExchangeProtocol exRequest = new ExchangeProtocol();
+                        System.out.println(parts[0]);
+                        System.out.println(parts[1]);
+
+                        exRequest.setType(Operation.EXIST);
+                        String [] pathParts = parts[1].split("\\/");
+                        exRequest.setFileName(pathParts[pathParts.length - 1]);
+                        System.out.println(pathParts[pathParts.length - 1]);
+                        String subDir = "";
+                        for (int i = 0; i < pathParts.length - 1; i++) {
+                            String pathPart = pathParts[i];
+                            subDir += pathParts[i] + "/";
+                        }
+                        System.out.println("Sub Dir: " + subDir);
+                        exRequest.setSubDir(subDir.equals("")? null: subDir);
+                        //отправляем сообщение на сервер
+                        if (writeMessage(outObj, exRequest)) {
+                            System.out.println("Ожидание ответа от сервера...");
+                            ExchangeProtocol incomingEx = readMessage(inObj);
+                            if (incomingEx.getType() == Operation.EXIST_FALSE) {
+                                System.out.println("Такого файла на сервере нет!");
+                                continue;
+                            } else if (incomingEx.getType() == Operation.EXIST_TRUE) {
+                                System.out.println("Вы уверены, что хотите удалить файл?");
+                                System.out.print("[да/нет] > ");
+                                command = console.nextLine();
+                                if(command.equals("да")) {
+                                    ExchangeProtocol deleteFile = new ExchangeProtocol();
+                                    deleteFile.setType(Operation.DELETE);
+                                    deleteFile.setFileName(pathParts[pathParts.length - 1]);
+                                    deleteFile.setSubDir(subDir.equals("")? null: subDir);
+                                    if (writeMessage(outObj, deleteFile)) {
+                                        System.out.println("Файл удален!");
+                                        continue;
+                                    }
+                                } else {
+                                    System.out.println("Операция прервана");
+                                    continue;
+                                }
+                            }
+                            //сбросим кэш
+                            outObj.reset();
+                        }
+
+                    }
                 }
 
             }
+
+
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -179,6 +287,110 @@ public class Client {
             return false;
         }
         return true;
+    }
+
+//    private void uploadFile () {
+//        //загрузка файла на сервер
+//        //Загрузить файл на сервер UPLOAD source_path [destination_folder]
+//        String[] parts = command.split("\\s");
+//        //смотри есть ли такой файл
+//        File file = new File(parts[1]);
+//        long length = file.length();
+//        if(length == 0) {
+//            System.out.println("Файл не найден!");
+//            break;
+//        }
+//
+//        //формируем объекта для запроса на сервер
+//        ExchangeProtocol uploadRequest = new ExchangeProtocol();
+//        uploadRequest.setType(Operation.UPLOAD);
+//        //избавляемся от пути
+//        String[] fileParts = parts[1].split("\\/");
+//        System.out.println(fileParts[fileParts.length - 1]);
+//        uploadRequest.setFileName(fileParts[fileParts.length - 1]);
+//        uploadRequest.setSize(length);
+//        if (parts.length > 2) {
+//            if (parts[2].substring(parts[2].length() - 1) == "/")
+//                uploadRequest.setSubDir(parts[2]);
+//            else
+//                uploadRequest.setSubDir(parts[2] + "/");
+//        } else {
+//            uploadRequest.setSubDir(null);
+//        }
+//        //upload C:/Users/obelix/test31.txt lalala/bbb
+//        //upload C:/Users/obelix/test1.txt
+//        //upload C:/Users/obelix/02.avi
+//        if (writeMessage(outObj, uploadRequest)) {
+//            System.out.println("Ожидание ответа от сервера...");
+//            ExchangeProtocol incoming = readMessage(inObj);
+//            //файл в хранилище существует, перезаписать?
+//            if (incoming.type == Operation.UPLOAD_EXIST) {
+//                System.out.println("Файл на сервере существует, перезаписать? да/нет");
+//                System.out.print(">");
+//                command = console.nextLine();
+//                if (command.equals("нет")) {
+//                    continue;
+//                } else if (command.equals("да")) {
+//                    //формируем объекта для запроса на сервер
+//                    ExchangeProtocol overwriteRequest = new ExchangeProtocol();
+//                    overwriteRequest.setType(Operation.UPLOAD_OVERWRITE);
+//                    //отправить на сервер
+//                    if (writeMessage(outObj, overwriteRequest)) {
+//                        System.out.println("Ошибка отправки на сервер сообщения!");
+//                        break;
+//                    }
+//                }
+//
+//            }
+//            //если все норм и сервер готов принять файл
+//            if (incoming.type == Operation.UPLOAD_CONFIRM) {
+//                //открываем файл и кусками отправляем на сервер
+//                FileInputStream fin = new FileInputStream(parts[1]);
+//                OutputStream out = socket.getOutputStream();
+//                int count = 0;
+//                //отправляем на сервер
+//                System.out.println("Отправляем на север");
+//                while (true) {
+//                    ExchangeProtocol partFile = new ExchangeProtocol();
+//                    partFile.setType(Operation.UPLOAD_PART);
+//                    partFile.partFile = new byte[incoming.bufferSize];
+//                    count = fin.read(partFile.partFile);
+//                    if (count <= 0) break;
+//                    partFile.sizeOfPart = count;
+//                    outObj.writeObject(partFile);
+//                    //сбрасывает буффер, меньше жрет память, но замедляет процесс
+//                    outObj.reset();
+//                }
+//                System.out.println(" готово!");
+//                fin.close();
+//
+//            }
+//
+//
+//        } else {
+//            System.out.println("Ошибка отправки запрос на сервер! Попробуйте снова.");
+//        }
+//
+//    }
+
+    private void sendFile(ObjectOutputStream outObj, String path, int bufferSize) throws IOException {
+        FileInputStream fin = new FileInputStream(path);
+        int count = 0;
+        //отправляем на сервер
+        System.out.println("Отправляем на север");
+        while (true) {
+            ExchangeProtocol partFile = new ExchangeProtocol();
+            partFile.setType(Operation.UPLOAD_PART);
+            partFile.partFile = new byte[bufferSize];
+            count = fin.read(partFile.partFile);
+            if (count <= 0) break;
+            partFile.sizeOfPart = count;
+            outObj.writeObject(partFile);
+            //сбрасывает буффер, меньше жрет память, но замедляет процесс
+            outObj.reset();
+        }
+        System.out.println("Готово!");
+        fin.close();
     }
 
     public void stop() {

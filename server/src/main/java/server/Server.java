@@ -2,13 +2,17 @@ package server;
 
 import AuthService.*;
 import DatabaseHelper.SQLHelper;
-import StorageService.FileStorageService;
+import StorageService.*;
 import StorageService.StorageOperation;
+import StorageService.StorageService;
 import protocol.*;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,7 +33,8 @@ public class Server {
         UserData UD = DB.getUserDataByLogin("login2");
         //System.out.println(UD);
         //System.out.println(DB.getFileInfo("02.avi", 1).toString());
-        //System.out.println(DB.insertFileInfo("3.txt", "SomeDir", 100_100_100, UD));
+        //717477888
+        //System.out.println(DB.updateFileInfo(0, 717477888));
         //задаем кол-во потоков
         int countOfThreads = Integer.parseInt(cfg.getProperty("server.threads"));
         if (countOfThreads == 0)
@@ -111,7 +116,26 @@ public class Server {
                             if (incMessage.type == Operation.UPLOAD){
                                 System.out.println(incMessage.type);
                                 System.out.println(incMessage.fileName);
-                                //ToDo: необходимо сделать проверку на возможность записи файла
+                                System.out.println(incMessage);
+
+                                //открываем доступ к хранилищу
+                                StorageService SS = new HybridStorageService(this.cfg, this.DB);
+                                //проверяем наличие файла в хранилище
+                                FileInfo file = new FileInfo(-1, incMessage.getFileName(), incMessage.getSubDir(),
+                                        incMessage.getSize(), user.getUserId());
+                                System.out.println(file);
+                                //проверка на существование файла в хранилище
+                                if (SS.isFileExist(user ,file)) {
+                                    ExchangeProtocol answer = new ExchangeProtocol();
+                                    answer.setType(Operation.UPLOAD_EXIST);
+                                    try {
+                                        //пропихиваем ответ назад
+                                        outObj.writeObject(answer);
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                    continue;
+                                }
                                 ExchangeProtocol answer = new ExchangeProtocol();
                                 answer.setType(Operation.UPLOAD_CONFIRM);
                                 int buffSize = Integer.parseInt(cfg.getProperty("server.bufferSize"));
@@ -122,8 +146,96 @@ public class Server {
                                 } catch (IOException e) {
                                     e.printStackTrace();
                                 }
-                                this.readFileFromSocket(inObj, user,
-                                        incMessage.size, incMessage.fileName, buffSize);
+                                this.readFileFromSocket(inObj, user, file, SS,buffSize);
+                                SS.stop();
+                            }
+                            if (incMessage.type == Operation.UPLOAD_OVERWRITE) {
+
+                                System.out.println(incMessage.type);
+                                System.out.println(incMessage.fileName);
+                                System.out.println(incMessage);
+
+                                //открываем доступ к хранилищу
+                                StorageService SS = new HybridStorageService(this.cfg, this.DB);
+                                //проверяем наличие файла в хранилище
+                                FileInfo file = new FileInfo(-1, incMessage.getFileName(), incMessage.getSubDir(),
+                                        incMessage.getSize(), user.getUserId());
+                                System.out.println(file);
+
+                                ExchangeProtocol answer = new ExchangeProtocol();
+                                answer.setType(Operation.UPLOAD_CONFIRM);
+                                int buffSize = Integer.parseInt(cfg.getProperty("server.bufferSize"));
+                                answer.bufferSize = buffSize;
+                                try {
+                                    //пропихиваем ответ назад
+                                    outObj.writeObject(answer);
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                                this.readFileFromSocket(inObj, user, file, SS,buffSize);
+                                SS.stop();
+                            }
+                            if (incMessage.type == Operation.LIST) {
+                                System.out.println(incMessage);
+                                //открываем доступ к хранилищу
+                                StorageService SS = new HybridStorageService(this.cfg, this.DB);
+                                //получаем список файлов из хранилища
+                                ArrayList<String> listFiles = (ArrayList<String>) SS.getList(user);
+                                Collections.sort(listFiles);
+                                //формируем ответ
+                                ExchangeProtocol listAnswer = new ExchangeProtocol();
+                                listAnswer.setType(Operation.LIST);
+                                listAnswer.setList(listFiles);
+                                try {
+                                    //пропихиваем ответ назад
+                                    outObj.writeObject(listAnswer);
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                                SS.stop();
+                            }
+                            if (incMessage.type == Operation.EXIST) {
+                                System.out.println(incMessage);
+                                //открываем доступ к хранилищу
+                                StorageService SS = new HybridStorageService(this.cfg, this.DB);
+                                //проверяем наличие файла в хранилище
+                                FileInfo file = new FileInfo(-1, incMessage.getFileName(), incMessage.getSubDir(),
+                                        incMessage.getSize(), user.getUserId());
+                                System.out.println(file);
+                                //проверка на существование файла в хранилище
+                                ExchangeProtocol existAnswer = new ExchangeProtocol();
+                                if (SS.isFileExist(user, file)) {
+                                    existAnswer.setType(Operation.EXIST_TRUE);
+                                } else {
+                                    existAnswer.setType(Operation.EXIST_FALSE);
+                                }
+                                try {
+                                    //пропихиваем ответ назад
+                                    outObj.writeObject(existAnswer);
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+                                SS.stop();
+                            }
+                            if (incMessage.type == Operation.DELETE) {
+                                System.out.println(incMessage);
+                                //открываем доступ к хранилищу
+                                StorageService SS = new HybridStorageService(this.cfg, this.DB);
+                                //проверяем наличие файла в хранилище
+                                FileInfo file = new FileInfo(-1, incMessage.getFileName(), incMessage.getSubDir(),
+                                        incMessage.getSize(), user.getUserId());
+                                SS.deleteFile(user, file);
+                                SS.stop();
+                            }
+                            if (incMessage.type == Operation.DOWNLOAD) {
+                                System.out.println(incMessage);
+                                //открываем доступ к хранилищу
+                                StorageService SS = new HybridStorageService(this.cfg, this.DB);
+                                //проверяем наличие файла в хранилище
+                                FileInfo file = new FileInfo(-1, incMessage.getFileName(), incMessage.getSubDir(),
+                                        incMessage.getSize(), user.getUserId());
+                                //SS.deleteFile(user, file);
+                                SS.stop();
                             }
                         }
                     } catch (IOException e) {
@@ -163,31 +275,29 @@ public class Server {
     }
 
     //читаем файл из objectInputStream
-    public void readFileFromSocket(ObjectInputStream in, UserData UD, long length, String filename, int bufSize) {
-        //создаем сервис хранения файлов
-        FileStorageService fss = new FileStorageService(this.cfg);
-        fss.initService(UD, filename, StorageOperation.UPLOAD);
+    public void readFileFromSocket(ObjectInputStream in, UserData UD, FileInfo FI, StorageService SS, int bufSize) {
+        //создаем сервис хранения файлов с БД
 
-        System.out.println("Reading from socket " + filename);
+        SS.initService(UD, FI, StorageOperation.UPLOAD);
+
+        System.out.println("Reading from socket " + FI.getFileName());
 
         long readCount = 0;
         int count = 0;
 
-        while(readCount < length) {
+        while(readCount < FI.getSize()) {
             ExchangeProtocol partOfFile = null;
             try {
                 partOfFile = (ExchangeProtocol) in.readObject();
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
             }
-           // System.out.println(partOfFile.toString());
             if (partOfFile.type == Operation.UPLOAD_PART) {
                 count = partOfFile.sizeOfPart;
-                fss.writePartOfFileToStorage(partOfFile.partFile, count);
+                SS.writePartOfFileToStorage(partOfFile.partFile, count);
                 readCount += count;
             }
         }
-        fss.stop();
     }
 
     public void writeFileToSocket(Socket socket, int length, String filename, int bufSize) {

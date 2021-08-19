@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 
 //сервис хранения файлов на сервере в файлах
 public class FileStorageService implements StorageService {
@@ -20,9 +21,27 @@ public class FileStorageService implements StorageService {
     }
 
     @Override
-    public boolean initService(UserData user, String fileName, StorageOperation type) {
+    public boolean isFileExist(UserData user, FileInfo file) {
+        //заглушка
+        return false;
+    }
+
+    @Override
+    public boolean deleteFile(UserData user, FileInfo file) {
+        //заглушка
+        return false;
+    }
+
+    @Override
+    public List<String> getList(UserData user) {
+        //заглушка
+        return null;
+    }
+
+    @Override
+    public boolean initService(UserData user, FileInfo file, StorageOperation type) {
         //формируем путь к фалу пользователя
-        String path = this.configuration.getProperty("server.storageDirectory")+ "/"+ user.getLogin() + "/" + fileName;
+        String path = this.configuration.getProperty("server.storageDirectory")+ "/"+ user.getLogin() + "/" + file.getFileName();
         try {
             if (type == StorageOperation.UPLOAD) {
                 fileOut = new FileOutputStream(path);
@@ -55,18 +74,6 @@ public class FileStorageService implements StorageService {
             }
         }
         return true;
-    }
-
-    @Override
-    public boolean writeFileToStorage(byte[] data) {
-        //пока не нужно
-        return false;
-    }
-
-    @Override
-    public boolean readFileFromStorage(byte[] data) {
-        //пока не нужно
-        return false;
     }
 
     @Override
