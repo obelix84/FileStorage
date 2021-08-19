@@ -230,13 +230,14 @@ public class Server {
                             if (incMessage.type == Operation.DOWNLOAD) {
                                 System.out.println(incMessage);
                                 //открываем доступ к хранилищу
-                                StorageService SS = new HybridStorageService(this.cfg, this.DB);
+                                //StorageService SS = new HybridStorageService(this.cfg, this.DB);
                                 //проверяем наличие файла в хранилище
-                                FileInfo file = new FileInfo(-1, incMessage.getFileName(), incMessage.getSubDir(),
-                                        incMessage.getSize(), user.getUserId());
+                                //FileInfo file = new FileInfo(-1, incMessage.getFileName(), incMessage.getSubDir(),
+                                 //       incMessage.getSize(), user.getUserId());
                                 //SS.deleteFile(user, file);
-                                SS.stop();
+                                //SS.stop();
                             }
+
                         }
                     } catch (IOException e) {
                         e.printStackTrace();

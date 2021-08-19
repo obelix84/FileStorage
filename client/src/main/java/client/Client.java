@@ -252,7 +252,46 @@ public class Client {
                             outObj.reset();
                         }
 
+                    }else if (command.startsWith("download")) {
+                        //Удалить файл с сервера DOWNLOAD server_path dest_path
+                        String[] parts = command.split("\\s");
+                        //смотри есть ли такой файл
+                        ExchangeProtocol exRequest = new ExchangeProtocol();
+                        System.out.println(parts[0]);
+                        System.out.println(parts[1]);
+                        System.out.println(parts[2]);
+                        exRequest.setType(Operation.EXIST);
+                        String [] pathParts = parts[1].split("\\/");
+                        exRequest.setFileName(pathParts[pathParts.length - 1]);
+                        System.out.println(pathParts[pathParts.length - 1]);
+                        String subDir = "";
+                        for (int i = 0; i < pathParts.length - 1; i++) {
+                            String pathPart = pathParts[i];
+                            subDir += pathParts[i] + "/";
+                        }
+                        System.out.println("Sub Dir: " + subDir);
+                        exRequest.setSubDir(subDir.equals("")? null: subDir);
+                        //отправляем сообщение на сервер
+                        if (writeMessage(outObj, exRequest)) {
+                            System.out.println("Ожидание ответа от сервера...");
+                            ExchangeProtocol incomingEx = readMessage(inObj);
+                            if (incomingEx.getType() == Operation.EXIST_FALSE) {
+                                System.out.println("Такого файла на сервере нет!");
+                                continue;
+                            } else if (incomingEx.getType() == Operation.EXIST_TRUE) {
+                                System.out.println("Скачиваем файл...");
+                                ExchangeProtocol deleteFile = new ExchangeProtocol();
+                                deleteFile.setType(Operation.DELETE);
+                                deleteFile.setFileName(pathParts[pathParts.length - 1]);
+                                deleteFile.setSubDir(subDir.equals("")? null: subDir);
+                                System.out.println("Готово!");
+                            }
+                            //сбросим кэш
+                            outObj.reset();
+                        }
+
                     }
+
                 }
 
             }
