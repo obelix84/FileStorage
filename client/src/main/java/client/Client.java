@@ -13,6 +13,8 @@ import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static java.lang.System.exit;
+
 public class Client {
     //private Socket socket;
     private final static ExecutorService THREAD_POOL = Executors.newFixedThreadPool(5);
@@ -86,7 +88,7 @@ public class Client {
                     String command = console.nextLine();
                     //выход из клиента EXIT
                     if(command.equals("exit")) {
-                        break;
+                        exit(0);
                     } else if (command.startsWith("upload")) {
                         //Загрузить файл на сервер UPLOAD source_path [destination_folder]
                         String[] parts = command.split("\\s");
@@ -254,6 +256,7 @@ public class Client {
 
                     }else if (command.startsWith("download")) {
                         //Удалить файл с сервера DOWNLOAD server_path dest_path
+                        //download test31.txt c:/Users/obelix
                         String[] parts = command.split("\\s");
                         //смотри есть ли такой файл
                         ExchangeProtocol exRequest = new ExchangeProtocol();

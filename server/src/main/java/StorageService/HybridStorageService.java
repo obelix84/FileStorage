@@ -40,7 +40,7 @@ public class HybridStorageService implements StorageService{
         if (fileToDelete != null) {
             //удаляем файл в файловой системе
             File fileFS = new File(this.configuration.getProperty("server.storageDirectory") + "/"
-                    + (user.getDefaultDir() == null? user.getLogin():"") + "/" + fileToDelete.getId());
+                    + (user.getDefaultDir() == null? user.getLogin():user.getDefaultDir()) + "/" + fileToDelete.getId());
             if(fileFS.delete()){
                 //удаляем запись из базы
                 this.DB.deleteFile(fileToDelete.getId());
